@@ -22,11 +22,19 @@ workflows:
         script: |
           npx cap add ios || true
           npx cap sync ios
-      - name: Generate app icon
+      - name: Initialize signing keychain
         script: |
-          npx capacitor-assets generate --ios
-      - name: Set up automatic code signing
+          keychain initialize
+
+      - name: Fetch signing files
         script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Add signing certificate
+        script: |
+          keychain add-certificates
           xcode-project use-profiles
       - name: Increment build number
         script: |
