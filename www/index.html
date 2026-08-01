@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>おこづかい帳</title>
 <meta name="theme-color" content="#12161D">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -30,6 +30,7 @@
     --fixed:#9B8ACB;
   }
   *{box-sizing:border-box;}
+  html, body{ touch-action:manipulation; -webkit-text-size-adjust:100%; }
   body{
     margin:0;
     background:
@@ -243,42 +244,11 @@
     display:block; width:100%; margin-bottom:16px;
   }
   ::selection{background:var(--gold); color:#1b1508;}
-  .auth-overlay{
-    position:fixed; inset:0; z-index:80; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:24px;
-  }
-  .auth-box{width:100%; max-width:360px;}
-  .auth-box h1{font-size:24px; margin:0 0 4px;}
-  .auth-box .sub{font-size:11px; color:var(--text-dim); letter-spacing:.08em; margin-bottom:28px;}
-  .auth-error{font-size:12.5px; color:var(--danger); min-height:18px; margin:10px 0 4px; line-height:1.5;}
-  .auth-actions{display:flex; gap:8px; margin-top:14px;}
-  .auth-actions button{flex:1;}
-  .auth-forgot{display:block; text-align:center; margin-top:14px;}
 </style>
 </head>
 <body>
 
-<div class="auth-overlay" id="authOverlay">
-  <div class="auth-box">
-    <h1 class="serif">おこづかい帳</h1>
-    <div class="sub">CASH &amp; CARD LEDGER</div>
-    <label class="field">
-      <span class="flabel">メールアドレス</span>
-      <input type="text" id="authEmail" autocomplete="username" placeholder="you@example.com">
-    </label>
-    <label class="field">
-      <span class="flabel">パスワード（6文字以上）</span>
-      <input type="password" id="authPassword" autocomplete="current-password" placeholder="••••••••">
-    </label>
-    <div class="auth-error" id="authError"></div>
-    <div class="auth-actions">
-      <button class="btn-secondary" id="authSignupBtn">新規登録</button>
-      <button class="btn-primary" id="authLoginBtn">ログイン</button>
-    </div>
-    <button class="btn-text auth-forgot" id="authForgotBtn">パスワードを忘れた場合</button>
-  </div>
-</div>
-
-<div id="app" style="display:none;">
+<div id="app">
 
   <header class="app-header">
     <div>
@@ -301,7 +271,6 @@
 
   <!-- 記録タブ -->
   <section class="panel active" id="panel-record">
-    <div id="backupReminder" style="display:none;"></div>
     <button class="btn-primary fab-add" id="openAddModal">＋ 記録を追加する</button>
 
     <div class="card-surface">
@@ -357,26 +326,6 @@
 
   <!-- 設定タブ -->
   <section class="panel" id="panel-settings">
-    <div class="card-surface">
-      <div style="font-weight:700; font-size:14px; margin-bottom:8px;">アカウント</div>
-      <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">
-        ログイン中：<span id="authUserEmail" style="color:var(--text);"></span>
-      </div>
-      <button class="btn-secondary" id="logoutBtn" style="width:100%;">ログアウト</button>
-    </div>
-
-    <div class="card-surface">
-      <div style="font-weight:700; font-size:14px; margin-bottom:8px;">バックアップ</div>
-      <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px; line-height:1.6;">
-        データはこのアカウントにクラウド保存されているため、他の端末でも同じメールアドレスでログインすればそのまま使えます。念のため、ファイルとしての書き出しもできます。
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn-secondary" id="exportBackupBtn" style="flex:1;">書き出す</button>
-        <button class="btn-secondary" id="importBackupBtn" style="flex:1;">読み込む</button>
-      </div>
-      <input type="file" id="importFileInput" accept="application/json" style="display:none;">
-    </div>
-
     <div class="card-surface">
       <div style="font-weight:700; font-size:14px; margin-bottom:10px;">カテゴリ</div>
       <div id="categoryList" style="margin-bottom:10px;"></div>
@@ -681,10 +630,11 @@
       }
     }
 
-    // 固定費：毎月指定日に自動で発生させる（過去36ヶ月〜先24ヶ月分を生成）
+    // 固定費：毎月指定日に自動で発生させる（過去36ヶ月分。実際にその日が来るまでは記録に出さない）
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     for(const fc of fixedCosts){
-      for(let delta=-36; delta<=24; delta++){
+      for(let delta=-36; delta<=0; delta++){
         const [fy, fm] = addMonths(now.getFullYear(), now.getMonth(), delta);
         const day = clampDay(fy, fm, fc.day);
         const occDate = new Date(fy, fm, day);
@@ -692,13 +642,18 @@
         const occKey = fy*12+fm;
         const occAmount = getFixedAmountAt(fc, occKey);
         if(fc.kind==='cash'){
+          if(occDate > today) continue;
           events.push({id:'fixed-'+fc.id+'-'+ym, txId:'fixed:'+fc.id+':'+ym, date:occDate, amount:-occAmount, kind:'cash', affectsBalance:true, memo:fc.memo, detail:fc.detail||'', category:fc.category||'', isFixed:true, fixedId:fc.id});
         } else if(fc.kind==='card'){
           const card = getCard(fc.cardId);
           const useCard = card || {name:(fc.cardNameSnapshot||'削除済みカード'), color:'#666', closingDay:15, paymentOffset:1, paymentDay:10};
           const wDate = computeWithdrawalDate(occDate, useCard);
-          events.push({id:'fixed-use-'+fc.id+'-'+ym, txId:'fixed:'+fc.id+':'+ym+':use', date:occDate, withdrawalDate:wDate, amount:-occAmount, kind:'card_use', affectsBalance:false, memo:fc.memo, detail:fc.detail||'', category:fc.category||'', cardName:useCard.name, cardColor:useCard.color, isFixed:true, fixedId:fc.id, cardMissing:!card});
-          events.push({id:'fixed-withdraw-'+fc.id+'-'+ym, txId:'fixed:'+fc.id+':'+ym+':withdraw', date:wDate, purchaseDate:occDate, amount:-occAmount, kind:'card', affectsBalance:true, memo:fc.memo, detail:fc.detail||'', category:fc.category||'', cardName:useCard.name, cardColor:useCard.color, isFixed:true, fixedId:fc.id, cardMissing:!card});
+          if(occDate <= today){
+            events.push({id:'fixed-use-'+fc.id+'-'+ym, txId:'fixed:'+fc.id+':'+ym+':use', date:occDate, withdrawalDate:wDate, amount:-occAmount, kind:'card_use', affectsBalance:false, memo:fc.memo, detail:fc.detail||'', category:fc.category||'', cardName:useCard.name, cardColor:useCard.color, isFixed:true, fixedId:fc.id, cardMissing:!card});
+          }
+          if(wDate <= today){
+            events.push({id:'fixed-withdraw-'+fc.id+'-'+ym, txId:'fixed:'+fc.id+':'+ym+':withdraw', date:wDate, purchaseDate:occDate, amount:-occAmount, kind:'card', affectsBalance:true, memo:fc.memo, detail:fc.detail||'', category:fc.category||'', cardName:useCard.name, cardColor:useCard.color, isFixed:true, fixedId:fc.id, cardMissing:!card});
+          }
         }
       }
     }
@@ -751,25 +706,10 @@
     renderUpcoming();
     renderCardSettings();
     renderFixedList();
-    renderBackupReminder();
     renderCategoryList();
     renderSearchCategoryChips();
     renderSearch();
     $('#startingBalanceInput').value = meta.startingBalance || 0;
-  }
-
-  function renderBackupReminder(){
-    const el = $('#backupReminder');
-    const hasData = transactions.length>0 || fixedCosts.length>0 || cards.length>0;
-    if(!hasData){ el.style.display='none'; el.innerHTML=''; return; }
-    const last = meta.lastBackupAt ? new Date(meta.lastBackupAt) : null;
-    const days = last ? Math.floor((Date.now()-last.getTime())/86400000) : Infinity;
-    if(days < 7){ el.style.display='none'; el.innerHTML=''; return; }
-    el.className = 'backup-banner';
-    el.style.display = 'block';
-    const msg = last ? `最後のバックアップから<b>${days}日</b>経っています。` : `まだ一度もバックアップを書き出していません。`;
-    el.innerHTML = `${msg}iPhoneの仕様上、まれにデータが消えることがあります。念のため書き出しておきましょう。<br><button id="bannerExportBtn">今すぐ書き出す</button>`;
-    $('#bannerExportBtn').addEventListener('click', ()=>{ $('#exportBackupBtn').click(); });
   }
 
   function renderBalance(){
@@ -1230,53 +1170,6 @@
     }
   });
 
-  // ---------- バックアップ（書き出し／読み込み） ----------
-  $('#exportBackupBtn').addEventListener('click', async ()=>{
-    const backup = { exportedAt: new Date().toISOString(), meta, cards, transactions, fixedCosts };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const ymd = isoDate(new Date()).replace(/-/g,'');
-    a.href = url;
-    a.download = `okozukai-backup-${ymd}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 3000);
-    meta.lastBackupAt = new Date().toISOString();
-    await saveMeta();
-    renderBackupReminder();
-    showToast('バックアップを書き出しました');
-  });
-
-  $('#importBackupBtn').addEventListener('click', ()=>{ $('#importFileInput').click(); });
-
-  $('#importFileInput').addEventListener('change', async (ev)=>{
-    const file = ev.target.files[0];
-    if(!file) return;
-    try{
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if(!data || typeof data !== 'object') throw new Error('invalid format');
-      const ok = await showConfirm('現在のデータを、読み込んだバックアップの内容で上書きします。よろしいですか？');
-      if(!ok) return;
-      meta = data.meta || {startingBalance:0};
-      cards = Array.isArray(data.cards) ? data.cards : [];
-      transactions = Array.isArray(data.transactions) ? data.transactions : [];
-      fixedCosts = Array.isArray(data.fixedCosts) ? data.fixedCosts : [];
-      await saveMeta();
-      await saveCards();
-      await saveTransactions();
-      await saveFixedCosts();
-      render();
-      showToast('バックアップを読み込みました');
-    }catch(e){
-      showToast('ファイルの読み込みに失敗しました');
-    } finally {
-      ev.target.value = '';
-    }
-  });
-
   // ---------- カテゴリ ----------
   $('#addCategoryBtn').addEventListener('click', async ()=>{
     const name = $('#newCategoryInput').value.trim();
@@ -1529,63 +1422,13 @@
 
   if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
 
-  // ---------- 認証 ----------
-  function authErrorMessage(code){
-    const map = {
-      'auth/invalid-email': 'メールアドレスの形式が正しくありません',
-      'auth/user-not-found': 'そのメールアドレスは登録されていません',
-      'auth/wrong-password': 'パスワードが間違っています',
-      'auth/email-already-in-use': 'そのメールアドレスは既に使われています',
-      'auth/weak-password': 'パスワードは6文字以上にしてください',
-      'auth/invalid-credential': 'メールアドレスまたはパスワードが正しくありません',
-      'auth/too-many-requests': '試行回数が多すぎます。しばらくしてからお試しください',
-      'auth/network-request-failed': '通信エラーです。電波状況をご確認ください'
-    };
-    return map[code] || ('エラーが発生しました（'+code+'）');
-  }
-
+  // ---------- 認証（画面なし・自動サインイン） ----------
   auth.onAuthStateChanged((user)=>{
     if(user){
-      $('#authOverlay').style.display = 'none';
-      $('#app').style.display = 'block';
-      $('#authUserEmail').textContent = user.email || '';
       loadAll();
     } else {
-      $('#authOverlay').style.display = 'flex';
-      $('#app').style.display = 'none';
+      auth.signInAnonymously().catch((e)=>{ console.error(e); showToast('サーバーへの接続に失敗しました'); });
     }
-  });
-
-  $('#authLoginBtn').addEventListener('click', async ()=>{
-    const email = $('#authEmail').value.trim();
-    const pass = $('#authPassword').value;
-    $('#authError').textContent = '';
-    if(!email || !pass){ $('#authError').textContent='メールアドレスとパスワードを入力してください'; return; }
-    try{ await auth.signInWithEmailAndPassword(email, pass); }
-    catch(e){ $('#authError').textContent = authErrorMessage(e.code); }
-  });
-
-  $('#authSignupBtn').addEventListener('click', async ()=>{
-    const email = $('#authEmail').value.trim();
-    const pass = $('#authPassword').value;
-    $('#authError').textContent = '';
-    if(!email || !pass){ $('#authError').textContent='メールアドレスとパスワードを入力してください'; return; }
-    try{ await auth.createUserWithEmailAndPassword(email, pass); }
-    catch(e){ $('#authError').textContent = authErrorMessage(e.code); }
-  });
-
-  $('#authForgotBtn').addEventListener('click', async ()=>{
-    const email = $('#authEmail').value.trim();
-    $('#authError').textContent = '';
-    if(!email){ $('#authError').textContent='パスワード再設定にはメールアドレスの入力が必要です'; return; }
-    try{ await auth.sendPasswordResetEmail(email); $('#authError').textContent = '再設定用メールを送信しました。受信箱をご確認ください。'; }
-    catch(e){ $('#authError').textContent = authErrorMessage(e.code); }
-  });
-
-  $('#logoutBtn').addEventListener('click', async ()=>{
-    const ok = await showConfirm('ログアウトしますか？');
-    if(!ok) return;
-    await auth.signOut();
   });
 })();
 </script>
