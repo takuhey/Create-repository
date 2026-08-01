@@ -7,11 +7,11 @@ workflows:
       vars:
         BUNDLE_ID: "com.okozukaicho.app"
         XCODE_SCHEME: "App"
-      integrations:
-        app_store_connect: codemagic
       node: 20
       xcode: latest
       cocoapods: default
+    integrations:
+      app_store_connect: codemagic
     scripts:
       - name: Install npm dependencies
         script: |
