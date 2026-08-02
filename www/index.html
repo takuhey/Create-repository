@@ -1405,27 +1405,33 @@
 
   if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
 
+  function getSplashScreen(){
+    return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) ? window.Capacitor.Plugins.SplashScreen : null;
+  }
+
   // アプリがバックグラウンドから復帰した時、常に当月表示に戻す
   document.addEventListener('visibilitychange', ()=>{
+    const splash = getSplashScreen();
     if(document.visibilityState === 'hidden'){
-      // バックグラウンドに回る瞬間、古い月の内容が復帰時に一瞬見えないよう空にしておく
-      const list = $('#ledgerList');
-      if(list) list.innerHTML = '';
-      const searchList = $('#searchResultList');
-      if(searchList) searchList.innerHTML = '';
+      // バックグラウンドに回る瞬間、古い月の内容が見えないようスプラッシュ（ロゴ）画面を出しておく
+      if(splash){ splash.show({ showDuration: 0, autoHide: false }).catch(()=>{}); }
     } else if(document.visibilityState === 'visible'){
       viewDate = new Date();
       searchViewDate = new Date();
       renderLedger();
       renderBalance();
       renderSearch();
+      if(splash){ splash.hide().catch(()=>{}); }
     }
   });
 
   // ---------- 認証（画面なし・自動サインイン） ----------
   auth.onAuthStateChanged((user)=>{
     if(user){
-      loadAll();
+      loadAll().then(()=>{
+        const splash = getSplashScreen();
+        if(splash){ splash.hide().catch(()=>{}); }
+      });
     } else {
       auth.signInAnonymously().catch((e)=>{ console.error(e); showToast('サーバーへの接続に失敗しました'); });
     }
