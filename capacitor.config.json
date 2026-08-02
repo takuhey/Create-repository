@@ -1,5 +1,17 @@
-node_modules/
-ios/
-android/
-.DS_Store
-build/
+{
+  "appId": "com.okozukaicho.app",
+  "appName": "おこづかい帳",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "always"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": false,
+      "backgroundColor": "#12161D",
+      "showSpinner": false
+    }
+  }
+}
