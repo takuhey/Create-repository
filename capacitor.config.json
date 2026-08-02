@@ -1,9 +1,5 @@
-{
-  "appId": "com.okozukaicho.app",
-  "appName": "おこづかい帳",
-  "webDir": "www",
-  "bundledWebRuntime": false,
-  "ios": {
-    "contentInset": "always"
-  }
-}
+node_modules/
+ios/
+android/
+.DS_Store
+build/

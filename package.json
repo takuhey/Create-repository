@@ -1,16 +1,58 @@
-{
-  "name": "okozukai-cho",
-  "version": "1.0.0",
-  "description": "おこづかい帳 - iOSアプリ版",
-  "scripts": {
-    "sync": "npx cap sync"
-  },
-  "dependencies": {
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
-    "@capacitor/assets": "^3.0.5"
-  }
-}
+workflows:
+  ios-workflow:
+    name: おこづかい帳 iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: "com.okozukaicho.app"
+      groups:
+        - app_store_credentials
+      vars:
+        BUNDLE_ID: "com.okozukaicho.app"
+        XCODE_SCHEME: "App"
+      node: 20
+      xcode: latest
+      cocoapods: default
+    integrations:
+      app_store_connect: codemagic
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm install
+      - name: Add iOS platform (first run only)
+        script: |
+          npx cap add ios || true
+          npx cap sync ios
+      - name: Generate app icon
+        script: |
+          npx capacitor-assets generate --ios
+      - name: Set up keychain
+        script: |
+          keychain initialize
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+      - name: Set up automatic code signing
+        script: |
+          xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          cd ios/App
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Build ipa for distribution
+        script: |
+          xcode-project build-ipa \
+            --workspace "ios/App/App.xcworkspace" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
