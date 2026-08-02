@@ -336,14 +336,6 @@
     </div>
 
     <div class="card-surface">
-      <label class="field">
-        <span class="flabel">開始残高（今の手元・口座残高の基準値）</span>
-        <input type="number" id="startingBalanceInput" placeholder="0">
-      </label>
-      <button class="btn-secondary" id="saveStartingBalance">開始残高を保存</button>
-    </div>
-
-    <div class="card-surface">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <div style="font-weight:700; font-size:14px;">登録したカード</div>
       </div>
@@ -383,10 +375,10 @@
       <input type="number" id="txAmount" placeholder="0">
     </label>
 
-    <label class="field">
+    <div class="field">
       <span class="flabel">カテゴリ（任意）</span>
       <div class="chip-picker" id="txCategoryChips"></div>
-    </label>
+    </div>
 
     <label class="field">
       <span class="flabel">メモ</span>
@@ -482,10 +474,10 @@
       <input type="number" id="fixedAmount" placeholder="0">
     </label>
 
-    <label class="field">
+    <div class="field">
       <span class="flabel">カテゴリ（任意）</span>
       <div class="chip-picker" id="fixedCategoryChips"></div>
-    </label>
+    </div>
 
     <label class="field">
       <span class="flabel">毎月何日に発生しますか（1〜31、月末なら31）</span>
@@ -630,16 +622,19 @@
       }
     }
 
-    // 固定費：毎月指定日に自動で発生させる（過去36ヶ月分。実際にその日が来るまでは記録に出さない）
+    // 固定費：毎月指定日に自動で発生させる（開始月〜当月分。それより前の月には反映しない）
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayKey = now.getFullYear()*12+now.getMonth();
     for(const fc of fixedCosts){
+      const startKey = (typeof fc.createdYm === 'number') ? fc.createdYm : todayKey;
       for(let delta=-36; delta<=0; delta++){
         const [fy, fm] = addMonths(now.getFullYear(), now.getMonth(), delta);
+        const occKey = fy*12+fm;
+        if(occKey < startKey) continue;
         const day = clampDay(fy, fm, fc.day);
         const occDate = new Date(fy, fm, day);
         const ym = `${fy}-${fm}`;
-        const occKey = fy*12+fm;
         const occAmount = getFixedAmountAt(fc, occKey);
         if(fc.kind==='cash'){
           if(occDate > today) continue;
@@ -709,7 +704,6 @@
     renderCategoryList();
     renderSearchCategoryChips();
     renderSearch();
-    $('#startingBalanceInput').value = meta.startingBalance || 0;
   }
 
   function renderBalance(){
@@ -728,10 +722,7 @@
   function renderLedger(){
     $('#monthLabel').textContent = `${viewDate.getFullYear()}年${viewDate.getMonth()+1}月`;
     const y = viewDate.getFullYear(), m = viewDate.getMonth();
-    const monthStart = new Date(y,m,1);
     const events = buildEvents();
-    let running = meta.startingBalance||0;
-    for(const e of events){ if(e.date < monthStart && e.affectsBalance!==false) running += e.amount; }
 
     const monthEvents = events.filter(e=> e.date.getFullYear()===y && e.date.getMonth()===m);
     const today = new Date(); today.setHours(0,0,0,0);
@@ -742,7 +733,6 @@
       return;
     }
     for(const e of monthEvents){
-      if(e.affectsBalance !== false){ running += e.amount; }
       const row = document.createElement('div');
       row.className = 'row' + (e.date>today ? ' future' : '');
       const tagClass = e.kind==='card_use' ? 'card' : e.kind;
@@ -755,7 +745,7 @@
       }
       const hasDetail = !!(e.detail && e.detail.trim());
       const isOpen = expandedIds.has(e.txId);
-      const balCol = e.affectsBalance===false ? '引落待ち' : `残高 ${yen(running)}`;
+      const balCol = e.affectsBalance===false ? '引落待ち' : '';
       row.innerHTML = `
         <div class="date-col mono">${fmtDate(e.date)}<div class="wd">${wdShort(e.date)}</div></div>
         <div class="mid">
@@ -1181,14 +1171,6 @@
     render();
   });
 
-  // ---------- starting balance ----------
-  $('#saveStartingBalance').addEventListener('click', async ()=>{
-    const v = parseFloat($('#startingBalanceInput').value);
-    meta.startingBalance = isNaN(v)?0:v;
-    await saveMeta();
-    render();
-  });
-
   // ---------- card modal ----------
   function refreshCardColorSet(){
     const wrap = $('#cardColorSet');
@@ -1392,7 +1374,8 @@
         fc.kind = fixedType; fc.memo=memo; fc.amount=amount; fc.day=day; fc.detail=detail; fc.category=fixedSelectedCategory;
         if(fixedType==='card'){ fc.cardId = fixedSelectedCardId; fc.cardNameSnapshot = getCard(fixedSelectedCardId)?.name; } else { delete fc.cardId; }
       } else {
-        const fc = {id:uid(), kind:fixedType, memo, amount, day, detail, category:fixedSelectedCategory};
+        const nowForCreate = new Date();
+        const fc = {id:uid(), kind:fixedType, memo, amount, day, detail, category:fixedSelectedCategory, createdYm: nowForCreate.getFullYear()*12+nowForCreate.getMonth()};
         if(fixedType==='card'){ fc.cardId = fixedSelectedCardId; fc.cardNameSnapshot = getCard(fixedSelectedCardId)?.name; }
         fixedCosts.push(fc);
       }
