@@ -1407,7 +1407,13 @@
 
   // アプリがバックグラウンドから復帰した時、常に当月表示に戻す
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'visible'){
+    if(document.visibilityState === 'hidden'){
+      // バックグラウンドに回る瞬間、古い月の内容が復帰時に一瞬見えないよう空にしておく
+      const list = $('#ledgerList');
+      if(list) list.innerHTML = '';
+      const searchList = $('#searchResultList');
+      if(searchList) searchList.innerHTML = '';
+    } else if(document.visibilityState === 'visible'){
       viewDate = new Date();
       searchViewDate = new Date();
       renderLedger();
