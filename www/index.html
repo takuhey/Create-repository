@@ -1405,6 +1405,17 @@
 
   if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
 
+  // アプリがバックグラウンドから復帰した時、常に当月表示に戻す
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible'){
+      viewDate = new Date();
+      searchViewDate = new Date();
+      renderLedger();
+      renderBalance();
+      renderSearch();
+    }
+  });
+
   // ---------- 認証（画面なし・自動サインイン） ----------
   auth.onAuthStateChanged((user)=>{
     if(user){
