@@ -5,13 +5,5 @@
   "bundledWebRuntime": false,
   "ios": {
     "contentInset": "always"
-  },
-  "plugins": {
-    "SplashScreen": {
-      "launchShowDuration": 0,
-      "launchAutoHide": false,
-      "backgroundColor": "#12161D",
-      "showSpinner": false
-    }
   }
 }
